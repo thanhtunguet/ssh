@@ -12,7 +12,7 @@ When deploying a server or system for a client using Kubernetes/Rancher, you can
 
 2. **Port Forwarding**: Use `kubectl port-forward` to forward the SSH port from the container to your local machine. This allows you to securely access the container’s SSH server from your local machine.
 
-3. **SSH Access**: Once the port is forwarded, you can SSH into the container as if it were a node in your network. This provides you with direct access to the container’s environment and any network resources it has access to.
+3. **SSH Access**: Once the port is forwarded, you can SSH into the container using SSH keys. The container's default user is `root`, and it does not have a password.
 
 ## Deployment Instructions
 
@@ -21,6 +21,7 @@ When deploying a server or system for a client using Kubernetes/Rancher, you can
 - Kubernetes cluster managed by Rancher.
 - Rancher access with the ability to download the kubeconfig file.
 - `kubectl` installed on your local machine.
+- SSH public key to be used for authentication.
 
 ### Building the Docker Image
 
@@ -33,6 +34,27 @@ When deploying a server or system for a client using Kubernetes/Rancher, you can
 2. Build the Docker image:
    ```bash
    docker build -t your-dockerhub-username/ssh-container:latest .
+   ```
+
+### Creating a ConfigMap for SSH Keys
+
+1. Create a ConfigMap that contains your SSH public key. Save the following YAML to a file named `ssh-keys-configmap.yaml`:
+
+   ```yaml
+   apiVersion: v1
+   kind: ConfigMap
+   metadata:
+     name: ssh-keys
+   data:
+     authorized_keys: |
+       ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEArwKz... your-email@example.com
+   ```
+
+   Replace `ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEArwKz... your-email@example.com` with your actual SSH public key.
+
+2. Apply the ConfigMap to your Kubernetes cluster:
+   ```bash
+   kubectl apply -f ssh-keys-configmap.yaml
    ```
 
 ### Deploying the Container to Kubernetes
@@ -59,6 +81,14 @@ When deploying a server or system for a client using Kubernetes/Rancher, you can
              image: your-dockerhub-username/ssh-container:latest
              ports:
                - containerPort: 22
+             volumeMounts:
+               - name: ssh-keys
+                 mountPath: /root/.ssh/authorized_keys
+                 subPath: authorized_keys
+         volumes:
+           - name: ssh-keys
+             configMap:
+               name: ssh-keys
    ```
 
 2. Apply the deployment to your Kubernetes cluster:
@@ -78,7 +108,7 @@ Once port forwarding is set up, you can SSH into the container using the followi
 ssh root@localhost -p 2222
 ```
 
-Replace `root` with the appropriate username if needed. The password or key for SSH access should be configured in the container as per your requirements.
+Make sure that your SSH private key matches the public key stored in the ConfigMap.
 
 ## Dockerfile
 
@@ -108,3 +138,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request if you have suggestions or improvements.
+
